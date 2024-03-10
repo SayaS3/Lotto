@@ -1,52 +1,82 @@
 package pl.lotto.domain.numberreciever;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import pl.lotto.domain.AdjustableClock;
+import pl.lotto.domain.numberreciever.dto.InputNumbersResultDto;
+import pl.lotto.domain.numberreciever.dto.TicketDto;
 
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Set;
 
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
+
 
 class NumberReceiverFacadeTest {
+    AdjustableClock clock =
+            new AdjustableClock(LocalDateTime.of(2023,12,15,12,0,0).toInstant(ZoneOffset.UTC), ZoneId.systemDefault());
+    NumberReceiverFacade numberReceiverFacade = new NumberReceiverFacade(
+            new NumberValidator(),
+            new InMemoryNumberReceiverRepositoryTestImpl(),
+            clock
+    );
 
     @Test
     public void should_return_success_when_user_gave_six_numbers() {
         //given
-        NumberReceiverFacade numberReceiverFacade = new NumberReceiverFacade();
+        Set<Integer> numbersFromUser = Set.of(1, 2, 3, 4, 5, 6);
         //when
-        String result = numberReceiverFacade.inputNumbers(Set.of(1, 2, 3, 4, 5, 6));
+        InputNumbersResultDto result = numberReceiverFacade.inputNumbers(numbersFromUser);
         //then
-        assertThat(result).isEqualTo("success");
+        assertThat(result.message()).isEqualTo("success");
 
     }
 
     @Test
     public void should_return_failed_when_user_gave_less_than_six_numbers() {
         //given
-        NumberReceiverFacade numberReceiverFacade = new NumberReceiverFacade();
+        Set<Integer> numbersFromUser = Set.of(1, 2, 3, 4, 5);
         //when
-        String result = numberReceiverFacade.inputNumbers(Set.of(1, 2, 3, 4, 5));
+        InputNumbersResultDto result = numberReceiverFacade.inputNumbers(numbersFromUser);
         //then
-        assertThat(result).isEqualTo("failed");
+        assertThat(result.message()).isEqualTo("failed");
     }
 
     @Test
     public void should_return_failed_when_user_gave_more_than_six_numbers() {
         //given
-        NumberReceiverFacade numberReceiverFacade = new NumberReceiverFacade();
-        //when
-        String result = numberReceiverFacade.inputNumbers(Set.of(1, 2, 3, 4, 5, 6, 7));
+        Set<Integer> numbersFromUser = Set.of(1, 2, 3, 4, 5, 6, 7);
+        InputNumbersResultDto result = numberReceiverFacade.inputNumbers(numbersFromUser);
         //then
-        assertThat(result).isEqualTo("failed");
+        assertThat(result.message()).isEqualTo("failed");
     }
-
     @Test
     public void should_return_failed_when_user_gave_at_least_one_number_out_of_range_of_1_to_99() {
         //given
-        NumberReceiverFacade numberReceiverFacade = new NumberReceiverFacade();
+        Set<Integer> numbersFromUser = Set.of(1, 2000, 3, 4, 5, 6);
         //when
-        String result = numberReceiverFacade.inputNumbers(Set.of(1, 200, 3, 4, 5, 6));
+        InputNumbersResultDto result = numberReceiverFacade.inputNumbers(numbersFromUser);
         //then
-        assertThat(result).isEqualTo("failed");
+        assertThat(result.message()).isEqualTo("failed");
     }
+    @Test
+    public void should_return_save_to_database_when_user_gave_six_numbers() {
+        //given
+        Set<Integer> numbersFromUser = Set.of(1, 2, 3, 4, 5, 6);
+        InputNumbersResultDto result = numberReceiverFacade.inputNumbers(numbersFromUser);
+        LocalDateTime drawDate = LocalDateTime.of(2023,12,15,13,0,0);
+        //when
+        List<TicketDto> ticketDtos = numberReceiverFacade.userNumbers(drawDate);
+        //then
+        assertThat(ticketDtos).contains(
+                TicketDto.builder()
+                        .ticketId(result.ticketId())
+                        .drawDate(drawDate)
+                        .numbersFromUser(result.numbersFromUser())
+                        .build()
+        );
+    }
+
 }
